@@ -1,0 +1,38 @@
+{
+  "name": "desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "electron": "npx electron electron.js",
+    "dev": "vite",
+    "build": "electron-builder",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.1.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^26.0.12",
+    "svelte": "^5.36.13",
+    "vite": "^7.0.4"
+  },
+  "dependencies": {
+    "cf-email-decode": "^0.0.7",
+    "he": "^1.2.0",
+    "jsdom": "^26.1.0",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.54.1"
+  },
+  "build": {
+    "appId": "com.larbi.mailextractor",
+    "productName": "MailExtractor",
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    }
+  },
+  "main": "electron.js"
+}
