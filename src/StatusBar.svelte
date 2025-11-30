@@ -1,6 +1,7 @@
 <script>
   export let scrapingStatus;
   export let processed;
+  export let total;
   export let found;
   export let noEmail;
   export let errors;
@@ -11,7 +12,8 @@
   <div class="status">
     <span>{scrapingStatus}</span><br />
     <span>
-      Processed: {processed} | Emails found: {found} | No email: {noEmail} | Errors:
+      Total: {total} | Processed: {processed} | Emails found: {found} | No email:
+      {noEmail} | Errors:
       {errors}
     </span>
   </div>

@@ -1,5 +1,9 @@
 {
-  "name": "desktop",
+  "author": {
+    "name": "Larbi Asmaoui",
+    "email": "mail@example.com"
+  },
+  "name": "mail-extractor",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,14 +11,17 @@
     "electron": "npx electron electron.js",
     "dev": "vite",
     "build": "electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^6.1.0",
     "electron": "^30.0.0",
     "electron-builder": "^26.0.12",
     "svelte": "^5.36.13",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "cf-email-decode": "^0.0.7",
@@ -27,6 +34,7 @@
     "appId": "com.larbi.mailextractor",
     "productName": "MailExtractor",
     "linux": {
+      "icon": "public/icons",
       "target": [
         "AppImage",
         "deb"

@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
 import he from 'he'
 import { decode } from "cf-email-decode"
+import { scrapeWithPlaywright } from './scraper-playwright.js';
 
 const userAgents = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
@@ -21,7 +22,17 @@ function cleanEmail(email) {
 
     // Strip "mailto:", query params, and trim
     if (email.startsWith('mailto:')) email = email.slice(7);
-    email = email.split('?')[0].trim().replace(/[^\w@.\-+%]/g, '');
+    email = email.split('?')[0].trim();
+
+    // Decode URL encoding (%20, %40, etc.)
+    try {
+        email = decodeURIComponent(email);
+    } catch (e) {
+        // If decoding fails, continue with original
+    }
+
+    // Remove any non-email characters (no % allowed now)
+    email = email.replace(/[^\w@.\-+]/g, '');
     email = email.toLowerCase();
 
     // Format check
@@ -54,8 +65,8 @@ function extractEmailsFromTextNodes(doc, emailRegex) {
     return emails;
 }
 
-
-export async function scrape(url) {
+// Fast scraping with node-fetch + jsdom
+async function scrapeFast(url) {
     try {
         // Set a timeout for fetch (20s)
         const controller = new AbortController();
@@ -98,7 +109,7 @@ export async function scrape(url) {
             if (matches) emails.push(...matches);
         }
 
-        // Text nodes (NEW ADDITION)
+        // Text nodes
         emails.push(...extractEmailsFromTextNodes(doc, emailRegex));
 
         // Cloudflare protected emails
@@ -118,6 +129,13 @@ export async function scrape(url) {
             }
         });
 
+        // data-email attributes
+        const dataEmailElements = Array.from(doc.querySelectorAll('[data-email]'));
+        dataEmailElements.forEach(el => {
+            const email = el.getAttribute('data-email');
+            if (email) emails.push(email);
+        });
+
         // Clean + deduplicate
         emails = Array.from(new Set(emails.map(cleanEmail).filter(Boolean)));
 
@@ -125,4 +143,33 @@ export async function scrape(url) {
     } catch (err) {
         return { emails: [], url, pageTitle: '', error: err.message };
     }
+}
+
+// Hybrid scraper: try fast first, fallback to Playwright if needed
+export async function scrape(url) {
+    // Try fast scraping first
+    const fastResult = await scrapeFast(url);
+
+    // If we found emails, return immediately
+    if (fastResult.emails && fastResult.emails.length > 0) {
+        console.log(`✓ Fast scrape found ${fastResult.emails.length} email(s) on ${url}`);
+        return fastResult;
+    }
+
+    // If fast scraping had an error (not just no emails), return the error
+    if (fastResult.error && !fastResult.error.includes('Fetch error')) {
+        return fastResult;
+    }
+
+    // No emails found with fast method, try Playwright for JS-rendered content
+    console.log(`⟳ Trying Playwright for ${url}...`);
+    const playwrightResult = await scrapeWithPlaywright(url);
+
+    if (playwrightResult.emails && playwrightResult.emails.length > 0) {
+        console.log(`✓ Playwright found ${playwrightResult.emails.length} email(s) on ${url}`);
+    } else {
+        console.log(`✗ No emails found on ${url}`);
+    }
+
+    return playwrightResult;
 }

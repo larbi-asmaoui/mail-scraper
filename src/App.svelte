@@ -10,6 +10,7 @@
   let columns = [];
   let selectedColumn = "";
   let urls = [];
+  let total = 0;
   let scraping = false;
   let scrapingStatus = "";
   let currentScrapeUrl = "";
@@ -42,6 +43,41 @@
       selectedExportColumns = [...selectedExportColumns, col];
     }
   }
+
+  // Parse a CSV line properly handling quoted values
+  function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote (two consecutive quotes become one)
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          // Toggle quote mode
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // End of field
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    // Push the last field
+    result.push(current.trim());
+    
+    return result;
+  }
+
   function exportCSV() {
     // Build CSV string
     const header = selectedExportColumns.join(",");
@@ -76,15 +112,37 @@
     reader.onload = (e) => {
       const text = e.target.result;
       const lines = text.split(/\r?\n/);
-      columns = lines[0].split(",");
-      selectedColumn = columns[0];
-      urls = lines
+      const dataLines = lines.filter(
+        (line) => line.trim() && !line.trim().startsWith("#")
+      );
+      if (dataLines.length === 0) {
+        columns = [];
+        urls = [];
+        selectedColumn = "";
+        return;
+      }
+      
+      // Parse the header row using the CSV parser
+      columns = parseCSVLine(dataLines[0]);
+      
+      if (!selectedColumn || !columns.includes(selectedColumn)) {
+        selectedColumn = columns[0];
+      }
+      
+      // Parse data rows and extract URLs from the selected column
+      const columnIndex = columns.indexOf(selectedColumn);
+      urls = dataLines
         .slice(1)
         .map((row) => {
-          const cells = row.split(",");
-          return cells[columns.indexOf(selectedColumn)];
+          const cells = parseCSVLine(row);
+          return cells[columnIndex];
         })
-        .filter(Boolean);
+        .filter((url) => url && url.trim() !== "");
+
+      console.log("Parsed columns:", columns);
+      console.log("Selected column:", selectedColumn);
+      console.log("Column index:", columnIndex);
+      console.log("Parsed URLs:", urls.slice(0, 10)); // Log first 10 URLs
     };
     reader.readAsText(file);
   }
@@ -140,6 +198,7 @@
   onMount(() => {
     window.electron.on("scrape-result", (event, res) => {
       console.log("Received from Electron:", res);
+      total = res.total;
       processed = res.processed;
       progress = Math.round((res.processed / res.total) * 100);
       currentScrapeUrl = res.url;
@@ -198,6 +257,7 @@
   </div>
   <StatusBar
     {scrapingStatus}
+    {total}
     {processed}
     {found}
     {noEmail}
