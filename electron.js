@@ -10,17 +10,22 @@ let scrapingQueue = [];
 let scrapingActive = false;
 let scrapingPaused = false;
 let mainWindow = null;
+let processed = 0;
+let results = [];
+let currentIndex = 0;
+let lastProgressUpdate = 0;
 
 function startScrapingQueue(urls) {
     scrapingQueue = urls;
     scrapingActive = true;
     scrapingPaused = false;
-    let processed = 0;
-    const concurrency = 3; // Reduced from 10 to 3 to prevent freezing
-    let currentIndex = 0;
+    processed = 0;
+    currentIndex = 0;
+    results = new Array(scrapingQueue.length);
+    lastProgressUpdate = 0;
+
+    const concurrency = 5; // Reduced from 10 to 3 to prevent freezing
     let running = 0;
-    let results = new Array(scrapingQueue.length);
-    let lastProgressUpdate = 0;
 
     async function runNext() {
         if (!scrapingActive) return;
@@ -48,7 +53,7 @@ function startScrapingQueue(urls) {
                 lastProgressUpdate = now;
             }
         } catch (err) {
-            results[myIndex] = { emails: [], url, pageTitle: '', error: err.message };
+            results[myIndex] = { emails: [], url, pageTitle: '', error: err.message, };
         }
         running--;
         if (currentIndex < scrapingQueue.length) {
@@ -82,6 +87,18 @@ ipcMain.on('scrape-stop', async () => {
     await closeBrowser();
 });
 
+ipcMain.on('get-scrape-status', (event) => {
+    event.reply('scrape-status', {
+        scraping: scrapingActive,
+        paused: scrapingPaused,
+        processed,
+        total: scrapingQueue.length,
+        results: results.filter(r => r), // Send only completed results
+        currentIndex,
+        queue: scrapingQueue
+    });
+});
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1200,
@@ -93,12 +110,16 @@ function createWindow() {
         },
     });
     mainWindow = win;
-    // if (process.env.NODE_ENV === 'development') {
-    win.loadURL('http://localhost:5173');
-    // } else {
-    //     // In production, load the built index.html from the dist directory
-    //     win.loadFile(path.join(__dirname, 'dist', 'index.html'));
-    // }
+    
+    // Check if running in production (packaged app) or development
+    const isDev = !app.isPackaged;
+    
+    if (isDev) {
+        win.loadURL('http://localhost:5173');
+    } else {
+        // In production, load the built index.html from the dist directory
+        win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    }
 }
 
 app.whenReady().then(createWindow);

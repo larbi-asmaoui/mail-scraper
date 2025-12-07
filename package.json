@@ -10,7 +10,10 @@
   "scripts": {
     "electron": "npx electron electron.js",
     "dev": "vite",
-    "build": "electron-builder",
+    "build:svelte": "vite build",
+    "build": "vite build && electron-builder --linux",
+    "build:deb": "vite build && electron-builder --linux deb",
+    "build:appimage": "vite build && electron-builder --linux AppImage",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -33,6 +36,15 @@
   "build": {
     "appId": "com.larbi.mailextractor",
     "productName": "MailExtractor",
+    "files": [
+      "dist/**/*",
+      "electron.js",
+      "preload.js",
+      "scraper.js",
+      "scraper-playwright.js",
+      "package.json",
+      "node_modules/**/*"
+    ],
     "linux": {
       "icon": "public/icons",
       "target": [
@@ -40,7 +52,8 @@
         "deb"
       ],
       "category": "Utility"
-    }
+    },
+    "asar": true
   },
   "main": "electron.js"
 }

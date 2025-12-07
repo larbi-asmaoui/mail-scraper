@@ -47,13 +47,13 @@
   // Parse a CSV line properly handling quoted values
   function parseCSVLine(line) {
     const result = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
-    
+
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       const nextChar = line[i + 1];
-      
+
       if (char === '"') {
         if (inQuotes && nextChar === '"') {
           // Escaped quote (two consecutive quotes become one)
@@ -63,25 +63,34 @@
           // Toggle quote mode
           inQuotes = !inQuotes;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === "," && !inQuotes) {
         // End of field
         result.push(current.trim());
-        current = '';
+        current = "";
       } else {
         current += char;
       }
     }
-    
+
     // Push the last field
     result.push(current.trim());
-    
+
     return result;
   }
 
   function exportCSV() {
+    // Deduplicate by email - keep first occurrence
+    const uniqueEmailsMap = new Map();
+    results.forEach((row) => {
+      if (!uniqueEmailsMap.has(row.email)) {
+        uniqueEmailsMap.set(row.email, row);
+      }
+    });
+    const uniqueResults = Array.from(uniqueEmailsMap.values());
+
     // Build CSV string
     const header = selectedExportColumns.join(",");
-    const rows = results.map((row) => {
+    const rows = uniqueResults.map((row) => {
       return selectedExportColumns
         .map((col) => {
           if (col === "Email") return row.email;
@@ -121,14 +130,14 @@
         selectedColumn = "";
         return;
       }
-      
+
       // Parse the header row using the CSV parser
       columns = parseCSVLine(dataLines[0]);
-      
+
       if (!selectedColumn || !columns.includes(selectedColumn)) {
         selectedColumn = columns[0];
       }
-      
+
       // Parse data rows and extract URLs from the selected column
       const columnIndex = columns.indexOf(selectedColumn);
       urls = dataLines
@@ -216,11 +225,64 @@
       }
       if (res.error) errors++;
     });
+
     window.electron.on("scrape-done", () => {
       scraping = false;
       paused = false;
       scrapingStatus = "scraping complete";
     });
+
+    // Restore state from main process
+    window.electron.on("scrape-status", (event, status) => {
+      // Always restore state if we have data
+      if (
+        status.scraping ||
+        status.paused ||
+        (status.results && status.results.length > 0)
+      ) {
+        scraping = status.scraping;
+        paused = status.paused;
+        processed = status.processed;
+        total = status.total;
+        progress = total > 0 ? Math.round((processed / total) * 100) : 0;
+        if (status.queue) {
+          urls = status.queue;
+        }
+
+        // Reconstruct results and stats
+        let newResults = [];
+        let newFound = 0;
+        let newNoEmail = 0;
+        let newErrors = 0;
+
+        if (status.results) {
+          status.results.forEach((res) => {
+            if (res.emails && res.emails.length) {
+              newFound += res.emails.length;
+              res.emails.forEach((email) => {
+                newResults.push({
+                  email,
+                  website: res.url,
+                  pageTitle: res.pageTitle,
+                });
+              });
+            } else {
+              newNoEmail++;
+            }
+            if (res.error) newErrors++;
+          });
+        }
+
+        results = newResults;
+        found = newFound;
+        noEmail = newNoEmail;
+        errors = newErrors;
+
+        scrapingStatus = paused ? "scraping paused" : "scraping resumed...";
+      }
+    });
+
+    window.electron.send("get-scrape-status");
   });
 </script>
 

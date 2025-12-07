@@ -41,7 +41,7 @@ function cleanEmail(email) {
 
     // Exclude image file-like emails
     const ext = email.split('.').pop();
-    const imageExts = ['jpg', 'jpeg', 'png', 'svg', 'webp', 'gif'];
+    const imageExts = ['jpg', 'jpeg', 'png', 'svg', 'webp', 'gif', 'bmp', 'ico', 'tiff', 'tif', 'heic', 'avif'];
     if (imageExts.includes(ext)) return null;
 
     // Exclude 32-char hex local parts (tracker emails)
